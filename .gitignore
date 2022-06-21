@@ -127,3 +127,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Mac stuff
+.DS_Store
+
+# Data 
+meat_narratives/data
+meat_narratives/*.csv
+
+# Scripts
+meat_narratives/*.sh
