@@ -25,6 +25,7 @@ from sklearn.metrics import f1_score
 
 from transformers import AutoModel, AutoTokenizer
 from transformers import BertTokenizer, BertForSequenceClassification
+from transformers import RobertaTokenizer, RobertaForSequenceClassification
 
 from tqdm import tqdm
 
@@ -34,9 +35,12 @@ torch.manual_seed(0)
 random.seed(0)
 
 ## Global path and dicts
-DIR = "meat_narratives/data/"
-BERT_MODEL = "bert-base-uncased"
+DIR_GER_DATA = "meat_narratives/data/"
+DIR_ENG_DATA = "meat_narratives/data/AW__Coded_files/"
+BERT_MODEL_ENGLISH = "bert-base-uncased"
 BERT_MODEL_GERMAN = "bert-base-german-cased"
+
+ROBERTA_MODEL_ENGLISH = "roberta-base"
 
 statement_type_dict = { "narrative": 0,
                         "goal": 1,
@@ -70,7 +74,11 @@ statement_reference_dict = {
             "taste and texture" : 13,
             "world food supply" : 14,
             "highly processed" : 15,
-            "social fairness" : 16 
+            "social fairness" : 16, 
+            "oligopoly" : 17,
+            "tradition and culture" : 18,
+            "food security" : 19,
+            "social inequality": 20
 }  
 
 class color:
@@ -78,10 +86,10 @@ class color:
    BOLD = '\033[1m'
    END = '\033[0m'
 
-# Cleaner class
-class DataCleaner():
+# Cleaner class GERMAN 
+class DataCleanerGerman():
     '''
-        A utility class to clean the data and make the labels consistent.
+        A utility class to clean the GERMAN data and make the labels consistent.
     '''
 
     def __init__(self, fil_dir, statement_type_dict, statement_topic_dict,
@@ -173,6 +181,105 @@ class DataCleaner():
 
         return features, multilabel_dict
 
+
+# Cleaner class ENGLISH 
+class DataCleanerEnglish():
+    '''
+        A utility class to clean the ENGLISH data and make the labels consistent.
+    '''
+
+    def __init__(self, fil_dir, statement_type_dict, statement_topic_dict,
+                topic_valence_dict, statement_reference_dict):
+        self.DIR = fil_dir
+        self.statement_type_dict = statement_type_dict
+        self.statement_topic_dict = statement_topic_dict
+        self.topic_valence_dict = topic_valence_dict
+        self.statement_reference_dict = statement_reference_dict
+
+    @staticmethod
+    def generate_dataset(fil_dir):
+        cols = ['text','statement','statement_type','statement_topic',
+                                'topic_valence', 'statement_reference']
+        final_df = pd.DataFrame(columns = cols )
+        for file in os.listdir(fil_dir):
+            if file.endswith(".csv"):
+                df = pd.read_csv(fil_dir+file, delimiter=";")
+                df = df[cols]
+                df.dropna(inplace=True)
+                df.reset_index(drop=True, inplace=True)
+                final_df = pd.concat([final_df, df])
+
+        statements = final_df['statement_type'].to_list()
+        statements = ['narrative' if item.casefold() == 'narrativ' else item for item in statements]
+        statements = ['instrument' if item.casefold() == 'policy instrument' else item for item in statements]
+        statements = ['goal' if item.casefold() == 'policy goal' else item for item in statements]
+
+        valence = final_df['topic_valence'].to_list()
+        valence = ['contra' if item.casefold() == 'contra meat' else item for item in valence]
+        valence = ['contra' if item.casefold() == 'contra plant-based' else item for item in valence]
+        valence = ['pro' if item.casefold() == 'pro plant-based' else item for item in valence]
+        valence = ['pro' if item.casefold() == 'pro meat' else item for item in valence]
+        valence = [item.strip(" ") for item in valence]
+
+        final_df['statement_type'] = statements
+        final_df['topic_valence'] = valence
+        
+        final_df['statement_topic'] = final_df['statement_topic'].str.replace("-"," ")
+        references = final_df['statement_reference'].tolist()
+        references = [item.rstrip(" ") for item in references]
+        references = ['economy' if item.casefold() == 'economic' else item for item in references]
+        references = ['animal welfare' if item.casefold() == 'ann' else item for item in references]
+        references = ['moral and ethic' if item.casefold() == 'moral and ethics' else item for item in references]
+        references = ['water usage and quality' if item.casefold() == 'water-usage and quality' else item for item in references]
+        references = ['food security' if item.casefold() == 'world food supply' else item for item in references]
+        references = ['social fairness' if item.casefold() == 'social inequality' else item for item in references]
+
+        final_df['statement_reference'] = references
+
+        label_cols = ['statement','statement_type','statement_topic',
+                                'topic_valence', 'statement_reference']
+
+        final_df[label_cols] = final_df.apply(lambda row : row[label_cols].str.lower(), axis = 1)
+
+        return final_df
+
+    @staticmethod
+    def replace_key_value(list,type_dict):
+        for idx in range(len(list)-1):
+            list[idx] = type_dict[list[idx]]
+        return list
+
+    @staticmethod
+    def pre_process_data_to_numeric_labels(dataframe):
+        
+        dataframe['statement_type'] = dataframe.apply(lambda row : statement_type_dict[row['statement_type']], axis = 1)
+        dataframe['statement_topic'] = dataframe.apply(lambda row : statement_topic_dict[row['statement_topic']], axis = 1)
+        dataframe['topic_valence'] = dataframe.apply(lambda row : topic_valence_dict[row['topic_valence']], axis = 1)
+        dataframe['statment_reference'] = dataframe.apply(lambda row : statement_reference_dict[row['statement_reference']], axis = 1)
+
+        return dataframe
+
+    @staticmethod
+    def count_label_occurrences(dataframe):
+        counter_1 = Counter(dataframe['statement_type'])
+        counter_2 = Counter(dataframe['statement_topic'])
+        counter_3 = Counter(dataframe['topic_valence'])
+        counter_4 = Counter(dataframe['statement_reference'])
+
+        return counter_1, counter_2, counter_3, counter_4
+
+    @staticmethod
+    def create_features_and_labels(dataframe):
+        features = dataframe["text"]
+        multilabel_dict = {
+            "type": dataframe['statement_type'],
+            "topic": dataframe['statement_topic'],
+            "valence": dataframe['topic_valence'],
+            "reference": dataframe['statment_reference']
+        }
+
+        return features, multilabel_dict
+
 class MeatDataset(Dataset):
     '''
         PyTorch dataset class helper
@@ -210,13 +317,58 @@ class Identity(nn.Module):
     def forward(self, x):
         return x
 
-class MultilabelClassifier(nn.Module):
+class BERTMultilabelClassifier(nn.Module):
     '''
         Actual classification network
     '''
-    def __init__(self, n_type, n_topic, n_valence, n_reference):
+    def __init__(self, n_type, n_topic, n_valence, n_reference, language='en'):
         super().__init__()
-        self.model = BertForSequenceClassification.from_pretrained(BERT_MODEL_GERMAN, num_labels = 10)
+        self.language = language
+        if self.language == 'en':
+            self.MODEL = BERT_MODEL_ENGLISH
+        elif self.language == 'de':
+            self.MODEL = BERT_MODEL_GERMAN
+        self.model = BertForSequenceClassification.from_pretrained(self.MODEL, num_labels = 10)
+        self.model.dropout = Identity()
+        self.model.classifier = Identity()
+
+        self.s_type = nn.Sequential(
+            nn.Dropout(p=0.2),
+            nn.Linear(in_features=768, out_features=n_type)
+        )
+        self.s_topic = nn.Sequential(
+            nn.Dropout(p=0.2),
+            nn.Linear(in_features=768, out_features=n_topic)
+        )
+        self.s_valence = nn.Sequential(
+            nn.Dropout(p=0.2),
+            nn.Linear(in_features=768, out_features=n_valence)
+        )
+        self.s_reference = nn.Sequential(
+            nn.Dropout(p=0.2),
+            nn.Linear(in_features=768, out_features=n_reference)
+        )
+
+    def forward(self, x, attn):
+        out = self.model(x, attn)
+        
+        return {
+            'type': self.s_type(out.logits),
+            'topic': self.s_topic(out.logits),
+            'valence': self.s_valence(out.logits),
+            'reference': self.s_reference(out.logits)
+        }
+
+class RoBERTaMultilabelClassifier(nn.Module):
+    '''
+        Actual classification network
+    '''
+    def __init__(self, n_type, n_topic, n_valence, n_reference, language='en'):
+        super().__init__()
+        self.language = language
+        if self.language == 'en':
+            self.MODEL = ROBERTA_MODEL_ENGLISH
+        self.model = RobertaForSequenceClassification.from_pretrained(self.MODEL, num_labels = 10)
         self.model.dropout = Identity()
         self.model.classifier = Identity()
 
@@ -255,15 +407,19 @@ def criterion(loss_func,outputs,samples,device):
    return losses
 
 # Train function
-def train_model(model,device,lr_rate,epochs,train_loader):
+def train_model(model,device,lr_rate,epochs,train_loader,model_type):
 
     num_epochs = epochs
     losses = []
     checkpoint_losses = []
 
     # Freeze the BERT layers
-    for param in model.model.bert.parameters():
-        param.requires_grad = False
+    if model_type == "bert":
+        for param in model.model.bert.parameters():
+            param.requires_grad = False
+    elif model_type == "roberta":
+        for param in model.model.roberta.parameters():
+            param.requires_grad = False
 
     # Specify optimiser only for FC layers
     optimizer_params = [
@@ -302,7 +458,7 @@ def train_model(model,device,lr_rate,epochs,train_loader):
 
     return checkpoint_losses
 
-def validate_model(model,device, val_loader, batch_size):
+def validate_model(model,device, val_loader, batch_size, model_type):
     model.eval()
 
     class_list = ["type", "topic", "valence", "reference"]
@@ -367,38 +523,88 @@ def calculate_f1_score(true, pred):
 
 def run(args):
 
-    # Load the cleaned dataset
-    df = DataCleaner.generate_dataset(DIR)
+    if args.dataset == "german":
+        # Load the cleaned dataset
+        df = DataCleanerGerman.generate_dataset(DIR_GER_DATA)
 
-    print()
-    ## Print counts of all labels
-    counter1, counter2, counter3, counter4 = DataCleaner.count_label_occurrences(df)
-    print(json.dumps(counter1, indent=2))
-    print(json.dumps(counter2, indent=2))
-    print(json.dumps(counter3, indent=2))
-    print(json.dumps(counter4, indent=2))
+        print("German dataset loaded")
+        ## Print counts of all labels
+        counter1, counter2, counter3, counter4 = DataCleanerGerman.count_label_occurrences(df)
+        print(json.dumps(counter1, indent=2))
+        print(json.dumps(counter2, indent=2))
+        print(json.dumps(counter3, indent=2))
+        print(json.dumps(counter4, indent=2))
 
-    # Create numeric labels
-    processed_df = DataCleaner.pre_process_data_to_numeric_labels(df)
+        # Create numeric labels
+        processed_df = DataCleanerGerman.pre_process_data_to_numeric_labels(df)
 
-    # Create lists of sentences and labels
-    features, labels = DataCleaner.create_features_and_labels(processed_df)
-    print(len(features)); print([len(labels[key]) for key in labels.keys()])
-    list_of_sentences = features.to_list()
-    print(list_of_sentences[0:2])
-    print(len(list_of_sentences))
+        # Create lists of sentences and labels
+        features, labels = DataCleanerGerman.create_features_and_labels(processed_df)
+        print(len(features)); print([len(labels[key]) for key in labels.keys()])
+        list_of_sentences = features.to_list()
+        print(list_of_sentences[0:2])
+        print(len(list_of_sentences))
 
-    # Tokenize sentence inputs
-    tokenizer = BertTokenizer.from_pretrained("bert-base-german-cased")
-    tokenized_inputs = tokenizer(list_of_sentences, return_tensors='pt', truncation=True, padding=True)
-    print(tokenized_inputs.items())
-    print(len(tokenized_inputs))
+        if args.model == "bert":
+            print("BERT model german") 
+            # Tokenize sentence inputs
+            tokenizer = BertTokenizer.from_pretrained("bert-base-german-cased")
+            tokenized_inputs = tokenizer(list_of_sentences, return_tensors='pt', truncation=True, padding=True)
+            print(tokenized_inputs.items())
+            print(len(tokenized_inputs))
+
+    elif args.dataset == "english":
+        # Load the cleaned dataset
+        df = DataCleanerEnglish.generate_dataset(DIR_ENG_DATA)
+
+        print("English dataset loaded")
+        ## Print counts of all labels
+        counter1, counter2, counter3, counter4 = DataCleanerEnglish.count_label_occurrences(df)
+        print(json.dumps(counter1, indent=2))
+        print(json.dumps(counter2, indent=2))
+        print(json.dumps(counter3, indent=2))
+        print(json.dumps(counter4, indent=2))
+
+        # Create numeric labels
+        processed_df = DataCleanerEnglish.pre_process_data_to_numeric_labels(df)
+
+        # Create lists of sentences and labels
+        features, labels = DataCleanerEnglish.create_features_and_labels(processed_df)
+        print(len(features)); print([len(labels[key]) for key in labels.keys()])
+        list_of_sentences = features.to_list()
+        print(list_of_sentences[0:2])
+        print(len(list_of_sentences))
+
+        if args.model == "bert":
+            print("BERT model english") 
+            # Tokenize sentence inputs
+            tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+            tokenized_inputs = tokenizer(list_of_sentences, return_tensors='pt', truncation=True, padding=True)
+            print(tokenized_inputs.items())
+            print(len(tokenized_inputs))
+        else:
+            print("RoBERTa model english")
+            # Tokenize sentence inputs
+            tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+            tokenized_inputs = tokenizer(list_of_sentences, return_tensors='pt', truncation=True, padding=True)
+            print(tokenized_inputs.items())
+            print(len(tokenized_inputs))
+
+    else:
+        print("Please specify a dataset")
+        return
 
     # Prepare dataset items
     text_data = MeatDataset(tokenized_inputs, labels)
     
     train_len = int(text_data.__len__()*0.8)
     val_len = int(text_data.__len__()*0.2)
+
+    if train_len + val_len != text_data.__len__():
+        print("Error in creating train and validation splits")
+        print("Fixing this by adding the difference to train set")
+        train_len += (text_data.__len__() - (train_len + val_len))
+
     print(f'train len is : {train_len}', f'val len is {val_len}')
     train_set, val_set = torch.utils.data.random_split(text_data , [train_len, val_len])
 
@@ -422,8 +628,16 @@ def run(args):
     num_refs = len(statement_reference_dict.keys())
     print(num_types, num_topics, num_valence, num_refs)
 
-    classifier = MultilabelClassifier(num_types, num_topics,
-                                    num_valence, num_refs)
+    if args.dataset == "german":
+        classifier = BERTMultilabelClassifier(num_types, num_topics,
+                                    num_valence, num_refs, language="de")
+    elif args.dataset == "english":
+        if args.model == "bert":
+            classifier = BERTMultilabelClassifier(num_types, num_topics,
+                                        num_valence, num_refs, language="en")
+        elif args.model == "roberta":
+            classifier = RoBERTaMultilabelClassifier(num_types, num_topics,
+                                        num_valence, num_refs, language="en")
     # print(classifier)
     
     # Choose device to run on
@@ -432,11 +646,11 @@ def run(args):
     classifier.to(device)  
 
     checkpoint_losses = train_model(classifier, device, args.learning_rate,
-                                    args.num_epochs, train_loader)
+                                    args.num_epochs, train_loader, args.model)
 
     
     val_losses, accuracy_values, actual_values, predicted_values = validate_model(classifier, device,
-                                    val_loader, args.batch_size)
+                                    val_loader, args.batch_size, args.model)
 
     print()
     for key in actual_values.keys():
@@ -459,6 +673,13 @@ def main():
                         type=float, default=1e-4,
                         required=False,
                         help= "choose learning rate")
+    parser.add_argument("-data", "--dataset", 
+                        type=str,
+                        required=False,
+                        help= "choose directory")
+    parser.add_argument("-model", "--model",
+                        type=str,
+                        help= "choose model")                        
     
     args = parser.parse_args()
     print(args)
