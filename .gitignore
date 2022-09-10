@@ -137,3 +137,6 @@ meat_narratives/*.csv
 
 # Scripts
 meat_narratives/*.sh
+
+# Plots
+meat_narratives/plots
