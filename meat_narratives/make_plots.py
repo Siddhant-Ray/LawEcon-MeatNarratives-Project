@@ -130,7 +130,21 @@ def make_plots(frame, args):
 
     # Plot a stacked bar chart for the statement reference
     reference_count = new_frame["statement_reference"].value_counts()
-    ax = reference_count.unstack().plot(kind="bar", stacked=True, figsize=(150, 100))
+    color_list = sns.color_palette("cubehelix", 5)
+    add_color_list = sns.color_palette("dark", 5)
+    color_list.extend(add_color_list)
+    add_color_list = sns.color_palette("Paired")[::-1][:5]
+    color_list.extend(add_color_list)
+    add_color_list = sns.color_palette("colorblind", 2)
+    color_list.extend(add_color_list)
+
+    ax = reference_count.unstack().plot(
+        kind="bar",
+        stacked=True,
+        figsize=(150, 100),
+        # Give me a list of 17 unique colors
+        color=color_list,
+    )
     plt.title(
         "Statement reference over time for the {} case".format(
             args.language.capitalize()
@@ -156,7 +170,23 @@ def make_plots(frame, args):
         new_frame["statement_reference"].value_counts().groupby(level=0).nlargest(5)
     )
     ax_5 = top_5_reference_count.unstack().plot(
-        kind="bar", stacked=True, figsize=(150, 100)
+        kind="bar",
+        stacked=True,
+        figsize=(150, 100),
+        # Tab color list for matplotlib
+        color=[
+            "#1f77b4",
+            "#ff7f0e",
+            "#2ca02c",
+            "#d62728",
+            "#9467bd",
+            "#8c564b",
+            "#e377c2",
+            "#7f7f7f",
+            "#bcbd22",
+            "#17becf",
+            "gold",
+        ],
     )
     plt.title(
         "Top 5 statement references per year for the {} case".format(
