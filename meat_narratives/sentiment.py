@@ -1,22 +1,20 @@
 from cgi import test
 from dataclasses import dataclass
 from unittest import TestCase
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-
+import pytorch_lightning as pl
 import torch
-import transformers
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
-
-from tqdm.notebook import tqdm
+import transformers
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-
-import pytorch_lightning as pl
+from torch.utils.data import DataLoader, Dataset
 from torchmetrics.functional import accuracy
+from tqdm.notebook import tqdm
 
 
 @dataclass

@@ -1,11 +1,10 @@
-import numpy as np, pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 import argparse
 
-from meatnarrative_clf import DataCleanerEnglish
-from meatnarrative_clf import DataCleanerGerman
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from meatnarrative_clf import DataCleanerEnglish, DataCleanerGerman
 
 DIR_GER_DATA = "meat_narratives/data/"
 DIR_ENG_DATA = "meat_narratives/data/AW__Coded_files/"
@@ -215,6 +214,89 @@ def make_plots(frame, args):
     )
 
 
+def make_more_plots(frame, args):
+    # Group frame statement type and split into sub frames
+    grouped_frame = frame.groupby("statement_topic")
+    # Split grouped frame
+    for name, group in grouped_frame:
+        # Groupby year
+        group = group.groupby("year")
+        # Plot a stacked bar chart for topic valence
+        valence_count = group["topic_valence"].value_counts()
+        valence_count.unstack().plot(kind="bar", stacked=True, figsize=(10, 10))
+        plt.title(
+            "Topic valence shifts for the statement topic: {}".format(name.upper()),
+            fontsize=20,
+        )
+        plt.xlabel("Year", fontsize=14)
+        plt.ylabel("Number of statements", fontsize=14)
+        # Axes label sizes
+        plt.xticks(fontsize=12)
+        plt.yticks(fontsize=12)
+        plt.legend(loc="upper left", fontsize=14)
+        # Manual legend size for English
+        if args.language == "english":
+            plt.legend(loc="upper left", prop={"size": 16})
+        plt.savefig(
+            "meat_narratives/plots/{}_lang_topic_valence_shifts_for_topic_{}.pdf".format(
+                args.language, name
+            )
+        )
+
+        # Plot a stacked bar chart for top 5 statement references
+        top_5_reference_count = (
+            group["statement_reference"].value_counts().groupby(level=0).nlargest(5)
+        )
+        _ax_5 = top_5_reference_count.unstack().plot(
+            kind="bar",
+            stacked=True,
+            figsize=(150, 100),
+            # Tab color list for matplotlib
+            color=[
+                "#1f77b4",
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",
+                "#bcbd22",
+                "#17becf",
+                "gold",
+                "black",
+                "#ccffcc",
+            ],
+        )
+        plt.title(
+            "Top 5 statement references shifts for the statement topic: {}".format(
+                name.upper()
+            ),
+            fontsize=200,
+        )
+        plt.xlabel("Year", fontsize=140)
+        plt.ylabel("Number of statements", fontsize=140)
+        # Axes label sizes
+        plt.xticks(fontsize=140)
+        plt.yticks(fontsize=140)
+        # Legend font size
+        plt.legend(fontsize=120)
+        labels = [item.get_text() for item in _ax_5.get_xticklabels()]
+        # Get all first elements of list of tuples (convert tuples of years to years)
+        labels = [item.split(",")[0][1:] for item in labels]
+        _ax_5.set_xticklabels(labels)
+        # ax_5.get_legend().set_bbox_to_anchor((0.96, 0.8))
+        plt.legend(loc="upper left", prop={"size": 80})
+        # Manual legend size for english
+        if args.language == "english":
+            plt.legend(loc="upper left", prop={"size": 80})
+        plt.savefig(
+            "meat_narratives/plots/{}_lang_top_5_statement_reference_for_topic_{}.pdf".format(
+                args.language, name
+            )
+        )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--language", type=str, default="german")
@@ -222,6 +304,7 @@ def main():
 
     frame = get_data(args)
     make_plots(frame, args)
+    make_more_plots(frame, args)
 
 
 if __name__ == "__main__":

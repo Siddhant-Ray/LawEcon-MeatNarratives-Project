@@ -1,33 +1,27 @@
+import argparse
+import json
+import os
+import random
 from calendar import c
-import random, os
+from collections import Counter
+
+import matplotlib.image as img
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-from collections import Counter
-import argparse
-
-import json
-
+import scipy.io
+import seaborn as sns
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
-
-import matplotlib.pyplot as plt
-import matplotlib.image as img
-import numpy as np
-import scipy.io
-import pandas as pd
-import seaborn as sns
-
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score
-
-from transformers import AutoModel, AutoTokenizer, AutoModelForSequenceClassification
-from transformers import BertTokenizer, BertForSequenceClassification
-from transformers import RobertaTokenizer, RobertaForSequenceClassification
-
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
+from transformers import (AutoModel, AutoModelForSequenceClassification,
+                          AutoTokenizer, BertForSequenceClassification,
+                          BertTokenizer, RobertaForSequenceClassification,
+                          RobertaTokenizer)
 
 # Set seeds
 np.random.seed(0)
