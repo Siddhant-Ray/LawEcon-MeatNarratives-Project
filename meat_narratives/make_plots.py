@@ -269,7 +269,7 @@ def make_more_plots(frame, args):
             ],
         )
         plt.title(
-            "Top 5 statement references shifts for the statement topic: {}".format(
+            "Top 5 statement reference shifts for the statement topic: {}".format(
                 name.upper()
             ),
             fontsize=200,
